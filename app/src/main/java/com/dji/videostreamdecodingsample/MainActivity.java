@@ -28,6 +28,10 @@ import android.widget.Toast;
 
 import com.dji.videostreamdecodingsample.media.DJIVideoStreamDecoder;
 import com.dji.videostreamdecodingsample.media.NativeHelper;
+import com.tencent.rtmp.ITXLivePushListener;
+import com.tencent.rtmp.TXLiveConstants;
+import com.tencent.rtmp.TXLivePushConfig;
+import com.tencent.rtmp.TXLivePusher;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -41,7 +45,7 @@ import dji.sdk.camera.Camera;
 import dji.sdk.camera.VideoFeeder;
 import dji.sdk.codec.DJICodecManager;
 
-public class MainActivity extends Activity implements DJIVideoStreamDecoder.IYuvDataListener {
+public class MainActivity extends Activity implements DJIVideoStreamDecoder.IYuvDataListener, ITXLivePushListener {
     private static final String TAG = MainActivity.class.getSimpleName();
     private static final int MSG_WHAT_SHOW_TOAST = 0;
     private static final int MSG_WHAT_UPDATE_TITLE = 1;
@@ -67,6 +71,8 @@ public class MainActivity extends Activity implements DJIVideoStreamDecoder.IYuv
     protected VideoFeeder.VideoDataCallback mReceivedVideoDataCallBack = null;
     private boolean mIsVideoPublishing = false;
     private Button mBtnPlay;
+    private TXLivePushConfig mLivePushConfig;
+    private TXLivePusher mLivePusher;
 
     @Override
     protected void onResume() {
@@ -96,6 +102,9 @@ public class MainActivity extends Activity implements DJIVideoStreamDecoder.IYuv
         }
         if (mCodecManager != null) {
             mCodecManager.destroyCodec();
+        }
+        if (mIsVideoPublishing) {
+            stopPublishRtmp();
         }
 
         super.onDestroy();
@@ -156,6 +165,59 @@ public class MainActivity extends Activity implements DJIVideoStreamDecoder.IYuv
         );
     }
 
+
+    private Bitmap decodeResource(Resources resources, int id) {
+        TypedValue value = new TypedValue();
+        resources.openRawResource(id, value);
+        BitmapFactory.Options opts = new BitmapFactory.Options();
+        opts.inTargetDensity = value.density;
+        return BitmapFactory.decodeResource(resources, id, opts);
+    }
+
+    private  boolean startPublishRtmp() {
+
+        int customModeType = 0;
+
+        //【示例代码1】设置自定义视频采集逻辑 （自定义视频采集逻辑不要调用startPreview）
+        customModeType |= TXLiveConstants.CUSTOM_MODE_VIDEO_CAPTURE;
+        mLivePushConfig.setVideoResolution(TXLiveConstants.VIDEO_RESOLUTION_TYPE_640_360);
+        mLivePushConfig.setAutoAdjustBitrate(false);
+        mLivePushConfig.setVideoBitrate(1300);
+        mLivePushConfig.enableNearestIP(false);
+        mLivePushConfig.setVideoEncodeGop(3);
+        mLivePushConfig.setCustomModeType(customModeType);
+        mLivePusher.setPushListener(this);
+        mLivePushConfig.setPauseImg(300,5);
+        Bitmap bitmap = decodeResource(getResources(),R.drawable.pause_publish);
+        mLivePushConfig.setPauseImg(bitmap);
+        mLivePushConfig.setPauseFlag(TXLiveConstants.PAUSE_FLAG_PAUSE_VIDEO | TXLiveConstants.PAUSE_FLAG_PAUSE_AUDIO);
+
+        mLivePusher.startPusher(BASE_URL);
+
+        mIsVideoPublishing = true;
+
+
+        mBtnPlay.setBackgroundResource(R.drawable.play_pause);
+
+        return true;
+    }
+
+    private void stopPublishRtmp() {
+        mIsVideoPublishing = false;
+        mLivePusher.stopBGM();
+        mLivePusher.stopCameraPreview(true);
+        mLivePusher.stopScreenCapture();
+        mLivePusher.setPushListener(null);
+        mLivePusher.stopPusher();
+        mBtnPlay.setBackgroundResource(R.drawable.play_start);
+
+        if(mLivePushConfig != null) {
+            mLivePushConfig.setPauseImg(null);
+        }
+    }
+
+
+
     private void initUi() {
         savePath = (TextView) findViewById(R.id.activity_main_save_path);
         screenShot = (TextView) findViewById(R.id.activity_main_screen_shot);
@@ -172,11 +234,19 @@ public class MainActivity extends Activity implements DJIVideoStreamDecoder.IYuv
             videostreamPreviewTtView.setVisibility(View.VISIBLE);
         }
 
+        mLivePusher = new TXLivePusher(this);
+        mLivePushConfig = new TXLivePushConfig();
+        mLivePusher.setConfig(mLivePushConfig);
+
         mBtnPlay = findViewById(R.id.btn_play_or_stop);
         mBtnPlay.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-
+                if (!mIsVideoPublishing) {
+                    startPublishRtmp();
+                } else {
+                    stopPublishRtmp();
+                }
             }
         });
     }
@@ -282,7 +352,10 @@ public class MainActivity extends Activity implements DJIVideoStreamDecoder.IYuv
 
     @Override
     public void onYuvDataReceived(byte[] yuvFrame, int width, int height) {
-//        mLivePusher.sendCustomVideoData(yuvFrame,TXLivePusher.YUV_420P,width,height);
+        if (mIsVideoPublishing) {
+            mLivePusher.sendCustomVideoData(yuvFrame,TXLivePusher.YUV_420P,width,height);
+        }
+
 
 //        //In this demo, we test the YUV data by saving it into JPG files.
 //        if (DJIVideoStreamDecoder.getInstance().frameIndex % 30 == 0) {
@@ -400,5 +473,15 @@ public class MainActivity extends Activity implements DJIVideoStreamDecoder.IYuv
         path = path + "\n";
         stringBuilder.append(path);
         savePath.setText(stringBuilder.toString());
+    }
+
+    @Override
+    public void onPushEvent(int i, Bundle bundle) {
+
+    }
+
+    @Override
+    public void onNetStatus(Bundle bundle) {
+
     }
 }
