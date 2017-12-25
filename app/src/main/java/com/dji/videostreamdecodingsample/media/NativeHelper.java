@@ -71,6 +71,7 @@ public class NativeHelper {
         return instance;
     }
 
+
     private NativeHelper() {
     }
 

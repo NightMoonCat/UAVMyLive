@@ -28,12 +28,14 @@ import android.widget.Toast;
 
 import com.dji.videostreamdecodingsample.media.DJIVideoStreamDecoder;
 import com.dji.videostreamdecodingsample.media.NativeHelper;
+import com.dji.videostreamdecodingsample.utils.ThreadPoolUtil;
 import com.tencent.rtmp.ITXLivePushListener;
 import com.tencent.rtmp.TXLiveConstants;
 import com.tencent.rtmp.TXLivePushConfig;
 import com.tencent.rtmp.TXLivePusher;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -180,43 +182,30 @@ public class MainActivity extends Activity implements DJIVideoStreamDecoder.IYuv
 
         //【示例代码1】设置自定义视频采集逻辑 （自定义视频采集逻辑不要调用startPreview）
         customModeType |= TXLiveConstants.CUSTOM_MODE_VIDEO_CAPTURE;
-        mLivePushConfig.setVideoResolution(TXLiveConstants.VIDEO_RESOLUTION_TYPE_640_360);
-        mLivePushConfig.setAutoAdjustBitrate(false);
-        mLivePushConfig.setVideoBitrate(1300);
-        mLivePushConfig.enableNearestIP(false);
-        mLivePushConfig.setVideoEncodeGop(3);
         mLivePushConfig.setCustomModeType(customModeType);
+
+        mLivePushConfig.setVideoResolution(TXLiveConstants.VIDEO_RESOLUTION_TYPE_1280_720);
+//        mLivePushConfig.setAutoAdjustBitrate(true);
+//        mLivePushConfig.enableNearestIP(false);
+//        mLivePushConfig.setVideoEncodeGop(30);
+//        mLivePushConfig.setVideoEncodeGop(0);
         mLivePusher.setPushListener(this);
-        mLivePushConfig.setPauseImg(300,5);
-        Bitmap bitmap = decodeResource(getResources(),R.drawable.pause_publish);
-        mLivePushConfig.setPauseImg(bitmap);
-        mLivePushConfig.setPauseFlag(TXLiveConstants.PAUSE_FLAG_PAUSE_VIDEO | TXLiveConstants.PAUSE_FLAG_PAUSE_AUDIO);
+        mLivePushConfig.enableNearestIP(false);
+//        mLivePushConfig.setPauseImg(300,5);
+//        Bitmap bitmap = decodeResource(getResources(),R.drawable.pause_publish);
+//        mLivePushConfig.setPauseImg(bitmap);
+//        mLivePushConfig.setPauseFlag(TXLiveConstants.PAUSE_FLAG_PAUSE_VIDEO | TXLiveConstants.PAUSE_FLAG_PAUSE_AUDIO);
+        mLivePushConfig.setVideoEncodeGop(-1);
+        mLivePusher.setConfig(mLivePushConfig);
 
         mLivePusher.startPusher(BASE_URL);
 
         mIsVideoPublishing = true;
 
-
         mBtnPlay.setBackgroundResource(R.drawable.play_pause);
 
         return true;
     }
-
-    private void stopPublishRtmp() {
-        mIsVideoPublishing = false;
-        mLivePusher.stopBGM();
-        mLivePusher.stopCameraPreview(true);
-        mLivePusher.stopScreenCapture();
-        mLivePusher.setPushListener(null);
-        mLivePusher.stopPusher();
-        mBtnPlay.setBackgroundResource(R.drawable.play_start);
-
-        if(mLivePushConfig != null) {
-            mLivePushConfig.setPauseImg(null);
-        }
-    }
-
-
 
     private void initUi() {
         savePath = (TextView) findViewById(R.id.activity_main_save_path);
@@ -236,7 +225,6 @@ public class MainActivity extends Activity implements DJIVideoStreamDecoder.IYuv
 
         mLivePusher = new TXLivePusher(this);
         mLivePushConfig = new TXLivePushConfig();
-        mLivePusher.setConfig(mLivePushConfig);
 
         mBtnPlay = findViewById(R.id.btn_play_or_stop);
         mBtnPlay.setOnClickListener(new View.OnClickListener() {
@@ -249,6 +237,22 @@ public class MainActivity extends Activity implements DJIVideoStreamDecoder.IYuv
                 }
             }
         });
+    }
+
+
+
+    private void stopPublishRtmp() {
+        mIsVideoPublishing = false;
+        mLivePusher.stopBGM();
+        mLivePusher.stopCameraPreview(true);
+        mLivePusher.stopScreenCapture();
+        mLivePusher.setPushListener(null);
+        mLivePusher.stopPusher();
+        mBtnPlay.setBackgroundResource(R.drawable.play_start);
+
+        if(mLivePushConfig != null) {
+            mLivePushConfig.setPauseImg(null);
+        }
     }
 
     private void notifyStatusChange() {
@@ -266,14 +270,13 @@ public class MainActivity extends Activity implements DJIVideoStreamDecoder.IYuv
         mReceivedVideoDataCallBack = new VideoFeeder.VideoDataCallback() {
 
             @Override
-            public void onReceive(byte[] videoBuffer, int size) {
+            public void onReceive(final byte[] videoBuffer, int size) {
                 //Log.d(TAG, "camera recv video data size: " + size);
                 if (useSurface) {
                     DJIVideoStreamDecoder.getInstance().parse(videoBuffer, size);
                 } else if (mCodecManager != null) {
                     mCodecManager.sendDataToDecoder(videoBuffer, size);
                 }
-
             }
         };
 
@@ -350,15 +353,18 @@ public class MainActivity extends Activity implements DJIVideoStreamDecoder.IYuv
         });
     }
 
+
+
     @Override
     public void onYuvDataReceived(byte[] yuvFrame, int width, int height) {
-        if (mIsVideoPublishing) {
-            mLivePusher.sendCustomVideoData(yuvFrame,TXLivePusher.YUV_420P,width,height);
-        }
 
+        if (mIsVideoPublishing) {
+            mLivePusher.sendCustomVideoData(yuvFrame, TXLivePusher.YUV_420P,width,height);
+        }
 
 //        //In this demo, we test the YUV data by saving it into JPG files.
 //        if (DJIVideoStreamDecoder.getInstance().frameIndex % 30 == 0) {
+//
 //            byte[] y = new byte[width * height];
 //            byte[] u = new byte[width * height / 4];
 //            byte[] v = new byte[width * height / 4];
@@ -477,7 +483,7 @@ public class MainActivity extends Activity implements DJIVideoStreamDecoder.IYuv
 
     @Override
     public void onPushEvent(int i, Bundle bundle) {
-
+        Toast.makeText(this, i+"----"+bundle.getString(TXLiveConstants.EVT_DESCRIPTION), Toast.LENGTH_SHORT).show();
     }
 
     @Override

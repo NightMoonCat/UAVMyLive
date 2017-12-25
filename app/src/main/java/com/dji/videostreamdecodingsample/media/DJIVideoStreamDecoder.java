@@ -11,6 +11,7 @@ import android.os.HandlerThread;
 import android.os.Message;
 import android.util.Log;
 import android.view.Surface;
+import android.widget.Toast;
 
 import com.dji.videostreamdecodingsample.R;
 
@@ -48,7 +49,7 @@ import dji.sdk.sdkmanager.DJISDKManager;
  */
 public class DJIVideoStreamDecoder implements NativeHelper.NativeDataListener {
     private static final String TAG = DJIVideoStreamDecoder.class.getSimpleName();
-    private static final int BUF_QUEUE_SIZE = 30;
+    private static final int BUF_QUEUE_SIZE = 120;
     private static final int MSG_INIT_CODEC = 0;
     private static final int MSG_FRAME_QUEUE_IN = 1;
     private static final int MSG_DECODE_FRAME = 2;
@@ -378,11 +379,11 @@ public class DJIVideoStreamDecoder implements NativeHelper.NativeDataListener {
             logd("initVideoDecoder: yuv output");
             // The surface is null, which means that the yuv data is needed, so the color format should
             // be set to YUV420.
-            format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Planar);
+            format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible);
         } else {
             logd("initVideoDecoder: display");
             // The surface is set, so the color format should be set to format surface.
-            format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
+            format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible);
         }
         try {
             // Create the codec instance.
@@ -479,11 +480,7 @@ public class DJIVideoStreamDecoder implements NativeHelper.NativeDataListener {
         if (dataHandler != null) {
             dataHandler.removeCallbacksAndMessages(null);
         }
-        if (Build.VERSION.SDK_INT >= 18) {
-            dataHandlerThread.quitSafely();
-        } else {
-            dataHandlerThread.quit();
-        }
+        dataHandlerThread.quitSafely();
 
         try {
             dataHandlerThread.join(3000);
@@ -605,6 +602,17 @@ public class DJIVideoStreamDecoder implements NativeHelper.NativeDataListener {
         }
     }
 
+    private static byte[] yuv420spToYuv420P(byte[] yuv420spData, int width, int height) {
+        byte[] yuv420pData = new byte[width * height * 3 / 2];
+        int ySize = width * height;
+        System.arraycopy(yuv420spData, 0, yuv420pData, 0, ySize);   //拷贝 Y 分量
+
+        for (int j = 0, i = 0; j < ySize / 2; j += 2, i++) {
+            yuv420pData[ySize + i] = yuv420spData[ySize + j];   //U 分量
+            yuv420pData[ySize * 5 / 4 + i] = yuv420spData[ySize + j + 1];   //V 分量
+        }
+        return yuv420pData;
+    }
     /**
      * Dequeue the frames from the queue and decode them using the hardware decoder.
      * @throws Exception
@@ -647,6 +655,37 @@ public class DJIVideoStreamDecoder implements NativeHelper.NativeDataListener {
                     yuvDataBuf.limit(bufferInfo.size - bufferInfo.offset);
                     byte[] bytes = new byte[bufferInfo.size - bufferInfo.offset];
                     yuvDataBuf.get(bytes);
+
+                    MediaFormat mediaFormat = codec.getOutputFormat();
+                    switch (mediaFormat.getInteger(MediaFormat.KEY_COLOR_FORMAT)) {
+                        case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV411Planar:
+                            Toast.makeText(context, "1", Toast.LENGTH_SHORT).show();
+                            break;
+                        case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV411PackedPlanar:
+                            Toast.makeText(context, "2", Toast.LENGTH_SHORT).show();
+
+                            break;
+                        case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420PackedPlanar:
+                            Toast.makeText(context, "3", Toast.LENGTH_SHORT).show();
+
+                            break;
+                        case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar:
+                            Toast.makeText(context, "4", Toast.LENGTH_SHORT).show();
+
+                            bytes = yuv420spToYuv420P(bytes, mediaFormat.getInteger(MediaFormat.KEY_WIDTH), mediaFormat.getInteger(MediaFormat.KEY_HEIGHT));
+                            break;
+                        case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420PackedSemiPlanar:
+                            Toast.makeText(context, "5", Toast.LENGTH_SHORT).show();
+
+                            break;
+                        case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Planar:
+                            Toast.makeText(context, "6", Toast.LENGTH_SHORT).show();
+                            break;
+                        default:
+                            Toast.makeText(context, "0000000000000", Toast.LENGTH_SHORT).show();
+                            break;
+                    }
+
                     Message message = dataHandler.obtainMessage();
                     message.obj = bytes;
                     message.arg1 = width;
@@ -724,7 +763,6 @@ public class DJIVideoStreamDecoder implements NativeHelper.NativeDataListener {
             DJIFrame newFrame = new DJIFrame(data, size, currentTime, currentTime, isKeyFrame,
                     frameNum, frameIndex, width, height);
             dataHandler.obtainMessage(MSG_FRAME_QUEUE_IN, newFrame).sendToTarget();
-
         }
     }
 }

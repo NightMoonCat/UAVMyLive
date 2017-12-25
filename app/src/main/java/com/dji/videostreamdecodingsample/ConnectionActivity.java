@@ -17,12 +17,16 @@ import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import dji.common.error.DJIError;
+import dji.common.useraccount.UserAccountState;
+import dji.common.util.CommonCallbacks;
 import dji.keysdk.DJIKey;
 import dji.keysdk.KeyManager;
 import dji.keysdk.ProductKey;
 import dji.keysdk.callback.KeyListener;
 import dji.sdk.base.BaseProduct;
 import dji.sdk.products.Aircraft;
+import dji.sdk.useraccount.UserAccountManager;
 
 
 public class ConnectionActivity extends Activity implements View.OnClickListener {
@@ -219,4 +223,17 @@ public class ConnectionActivity extends Activity implements View.OnClickListener
 //        }
     }
 
+    public void onLogin(View view) {
+        UserAccountManager.getInstance().logIntoDJIUserAccount(this, new CommonCallbacks.CompletionCallbackWith<UserAccountState>() {
+            @Override
+            public void onSuccess(UserAccountState userAccountState) {
+                Toast.makeText(ConnectionActivity.this, "成功", Toast.LENGTH_SHORT).show();
+            }
+
+            @Override
+            public void onFailure(DJIError djiError) {
+
+            }
+        });
+    }
 }
