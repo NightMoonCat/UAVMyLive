@@ -40,7 +40,6 @@ public class VideoDecodingApplication extends Application {
     }
 
     private DJISDKManager.SDKManagerCallback mDJISDKManagerCallback = new DJISDKManager.SDKManagerCallback() {
-
         @Override
         public void onRegister(DJIError error) {
 

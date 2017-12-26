@@ -199,28 +199,28 @@ public class ConnectionActivity extends Activity implements View.OnClickListener
         Log.v(TAG, "refreshSDKRelativeUI");
         mBtnOpen.setEnabled(true);
 
-//        if (null != mProduct && mProduct.isConnected()) {
-//            Log.v(TAG, "refreshSDK: True");
-//            mBtnOpen.setEnabled(true);
-//
-//            String str = mProduct instanceof Aircraft ? "DJIAircraft" : "DJIHandHeld";
-//            mTextConnectionStatus.setText("Status: " + str + " connected");
-//
-//            if (null != mProduct.getModel()) {
-//                mTextProduct.setText("" + mProduct.getModel().getDisplayName());
-//            } else {
-//                mTextProduct.setText(R.string.product_information);
-//            }
-//            if (KeyManager.getInstance() != null) {
-//                KeyManager.getInstance().addListener(firmkey, firmVersionListener);
-//            }
-//        } else {
-//            Log.v(TAG, "refreshSDK: False");
-//            mBtnOpen.setEnabled(false);
-//
-//            mTextProduct.setText(R.string.product_information);
-//            mTextConnectionStatus.setText(R.string.connection_loose);
-//        }
+        if (null != mProduct && mProduct.isConnected()) {
+            Log.v(TAG, "refreshSDK: True");
+            mBtnOpen.setEnabled(true);
+
+            String str = mProduct instanceof Aircraft ? "DJIAircraft" : "DJIHandHeld";
+            mTextConnectionStatus.setText("Status: " + str + " connected");
+
+            if (null != mProduct.getModel()) {
+                mTextProduct.setText("" + mProduct.getModel().getDisplayName());
+            } else {
+                mTextProduct.setText(R.string.product_information);
+            }
+            if (KeyManager.getInstance() != null) {
+                KeyManager.getInstance().addListener(firmkey, firmVersionListener);
+            }
+        } else {
+            Log.v(TAG, "refreshSDK: False");
+            mBtnOpen.setEnabled(false);
+
+            mTextProduct.setText(R.string.product_information);
+            mTextConnectionStatus.setText(R.string.connection_loose);
+        }
     }
 
     public void onLogin(View view) {

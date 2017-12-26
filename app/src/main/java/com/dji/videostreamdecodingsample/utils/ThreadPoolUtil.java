@@ -5,10 +5,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-/**
- * Created by liuxu on 2017/6/1.
- */
-
 public class ThreadPoolUtil {
 
     //4核的线程池
